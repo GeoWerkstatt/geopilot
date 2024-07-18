@@ -41,3 +41,8 @@ jobs:
       - name: Lint frontend
         working-directory: ./src/Geopilot.Frontend
         run: npm run lint
+
+      - name: Check localization files
+        uses: audiobookshelf/audiobookshelf-i18n-updater
+        with:
+          directory: './src/Geopilot.Frontend/public/locale'
