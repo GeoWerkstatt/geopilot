@@ -14,7 +14,7 @@ i18n
       caches: ["cookie"],
     },
     backend: {
-      loadPath: `/locale/{{lng}}/{{ns}}.json`,
+      loadPath: `/locale/{{lng}}.json`,
       allowMultiLoading: false,
       queryStringParams: { v: "1.0.0" },
     },
@@ -23,8 +23,6 @@ i18n
     },
     supportedLngs: ["de", "en", "it", "fr"],
     whitelist: ["de", "en", "it", "fr"],
-    ns: ["common"],
-    defaultNS: "common",
     interpolation: {
       escapeValue: false,
       formatSeparator: ",",
