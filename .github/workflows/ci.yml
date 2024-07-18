@@ -43,6 +43,6 @@ jobs:
         run: npm run lint
 
       - name: Check localization files
-        uses: audiobookshelf/audiobookshelf-i18n-updater
+        uses: audiobookshelf/audiobookshelf-i18n-updater@v1.3.0
         with:
           directory: './src/Geopilot.Frontend/public/locale'
