@@ -67,7 +67,6 @@
   "predecessor": "Prédécesseur",
   "privacyPolicy": "Politique de confidentialité",
   "reset": "Réinitialiser les modifications en cours",
-  "save": "Sauver",
   "spatialExtent": "Étendue spatiale",
   "spatialExtentIncompleteMessage": "Tous les champs doivent être soit vides, soit tous remplis. Vous souhaitez réinitialiser les modifications en cours?",
   "spatialExtentIncompleteTitle": "Étendue spatiale non valide",
