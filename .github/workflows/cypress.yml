@@ -21,6 +21,7 @@ jobs:
 
       - name: Setup dev-certs
         run: |
+          mkdir -p ~/.aspnet/https
           dotnet dev-certs https --export-path ~/.aspnet/https/geopilot.pem --no-password --format PEM
           dotnet dev-certs https --trust
 
