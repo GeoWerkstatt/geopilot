@@ -26,7 +26,7 @@ jobs:
           chmod -R 664 ./certs/*
 
       - name: Start db and api's
-        run: docker compose up
+        run: docker compose up --wait
 
       - name: Cypress run
         uses: cypress-io/github-action@v6
