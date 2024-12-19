@@ -23,9 +23,10 @@ jobs:
         run: |
           mkdir ./certs
           dotnet dev-certs https --trust --export-path ./certs/geopilot.pem --no-password --format PEM
+          chmod -R 664 ./certs
 
       - name: Start db and api's
-        run: docker compose up --wait
+        run: docker compose up
 
       - name: Cypress run
         uses: cypress-io/github-action@v6
