@@ -21,6 +21,8 @@ import { FieldEvaluationType, Mandate, Organisation, ValidationSettings } from "
 import { useApi } from "../../api";
 import { useGeopilotAuth } from "../../auth";
 import { FormAutocompleteValue } from "../../components/form/formAutocomplete.tsx";
+import { useControlledNavigate } from "../../components/controlledNavigate";
+import { PromptAction } from "../../components/prompt/promptInterfaces.ts";
 
 export const MandateDetail = () => {
   const { t } = useTranslation();
@@ -28,6 +30,8 @@ export const MandateDetail = () => {
   const formMethods = useForm({ mode: "all" });
   const { showPrompt } = useContext(PromptContext);
   const { fetchApi } = useApi();
+  const { registerCheckIsDirty, unregisterCheckIsDirty, checkIsDirty, leaveEditingPage, navigateTo } =
+    useControlledNavigate();
   const navigate = useNavigate();
   const { id } = useParams<{
     id: string;
@@ -37,11 +41,59 @@ export const MandateDetail = () => {
   const [organisations, setOrganisations] = useState<Organisation[]>();
   const [fileExtensions, setFileExtensions] = useState<string[]>();
 
+  useEffect(() => {
+    registerCheckIsDirty(`/admin/mandates/${id}`);
+
+    return () => {
+      unregisterCheckIsDirty(`/admin/mandates/${id}`);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (checkIsDirty) {
+      if (formMethods.formState.isDirty) {
+        const promptActions: PromptAction[] = [
+          { label: "cancel", icon: <CancelOutlinedIcon />, action: () => leaveEditingPage(false) },
+          {
+            label: "reset",
+            icon: <UndoOutlined />,
+            action: () => leaveEditingPage(true),
+          },
+        ];
+        if (formMethods.formState.isValid) {
+          promptActions.push({
+            label: "save",
+            icon: <SaveOutlinedIcon />,
+            variant: "contained",
+            action: () => {
+              saveMandate(formMethods.getValues() as Mandate, false).then(() => leaveEditingPage(true));
+            },
+          });
+        }
+        showPrompt("unsavedChanges", promptActions);
+      } else {
+        leaveEditingPage(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkIsDirty]);
+
   const loadMandate = useCallback(() => {
     if (id !== "0") {
       fetchApi<Mandate>(`/api/v1/mandate/${id}`, { errorMessageLabel: "mandateLoadingError" }).then(setMandate);
     } else {
-      setMandate({ id: 0, name: "", organisations: [], fileTypes: [], coordinates: [], deliveries: [] });
+      setMandate({
+        id: 0,
+        name: "",
+        organisations: [],
+        fileTypes: [],
+        coordinates: [
+          { x: undefined, y: undefined },
+          { x: undefined, y: undefined },
+        ],
+        deliveries: [],
+      });
     }
   }, [fetchApi, id]);
 
@@ -73,7 +125,7 @@ export const MandateDetail = () => {
     }
   }, [fileExtensions, loadFileExtensions, loadMandate, loadOrganisations, mandate, organisations, user?.isAdmin]);
 
-  async function saveMandate(data: FieldValues, closeAfterSave = false) {
+  async function saveMandate(data: FieldValues, reloadAfterSave = true) {
     if (id !== undefined) {
       const mandate = data as Mandate;
       mandate.deliveries = [];
@@ -88,9 +140,9 @@ export const MandateDetail = () => {
         errorMessageLabel: "mandateSaveError",
       }).then(response => {
         const mandateResponse = response as Mandate;
-        if (!closeAfterSave) {
+        if (reloadAfterSave) {
           if (id === "0") {
-            navigate(`/admin/mandates/${mandateResponse.id}`);
+            navigate(`/admin/mandates/${mandateResponse.id}`, { replace: true });
           } else {
             loadMandate();
           }
@@ -99,40 +151,17 @@ export const MandateDetail = () => {
     }
   }
 
-  const checkChangesBeforeNavigate = () => {
-    if (formMethods.formState.isDirty) {
-      showPrompt(t("unsavedChanges"), [
-        { label: t("cancel"), icon: <CancelOutlinedIcon /> },
-        {
-          label: t("reset"),
-          icon: <UndoOutlined />,
-          action: () => {
-            navigate(`/admin/mandates`);
-          },
-        },
-        {
-          label: t("save"),
-          icon: <SaveOutlinedIcon />,
-          variant: "contained",
-          action: () => {
-            saveMandate(formMethods.getValues() as Mandate, true).then(() => navigate(`/admin/mandates`));
-          },
-        },
-      ]);
-    } else {
-      navigate(`/admin/mandates`);
-    }
-  };
-
   const submitForm = (data: FieldValues) => {
-    saveMandate(data);
+    saveMandate(data, true);
   };
 
   // trigger form validation on mount
   useEffect(() => {
-    formMethods.trigger();
+    if (mandate) {
+      formMethods.trigger();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formMethods.trigger]);
+  }, [mandate, formMethods.trigger]);
 
   return (
     <FlexBox>
@@ -140,7 +169,9 @@ export const MandateDetail = () => {
         <BaseButton
           variant={"text"}
           icon={<ChevronLeft />}
-          onClick={checkChangesBeforeNavigate}
+          onClick={() => {
+            navigateTo("/admin/mandates");
+          }}
           label={"backToMandates"}
         />
         {id !== "0" && <Typography variant={"body2"}>{t("id") + ": " + id}</Typography>}
@@ -178,7 +209,12 @@ export const MandateDetail = () => {
                   />
                 </FormContainer>
                 <FormContainer>
-                  <FormExtent fieldName={"coordinates"} label={"spatialExtent"} value={mandate?.coordinates} />
+                  <FormExtent
+                    fieldName={"coordinates"}
+                    label={"spatialExtent"}
+                    value={mandate?.coordinates}
+                    required={true}
+                  />
                 </FormContainer>
               </GeopilotBox>
               <GeopilotBox>
@@ -187,7 +223,7 @@ export const MandateDetail = () => {
                 </Typography>
                 <FormContainer>
                   <FormSelect
-                    fieldName={"precursor"}
+                    fieldName={"evaluatePrecursorDelivery"}
                     label={"precursor"}
                     required={true}
                     selected={mandate?.evaluatePrecursorDelivery ? [mandate.evaluatePrecursorDelivery] : []}
@@ -198,7 +234,7 @@ export const MandateDetail = () => {
                     ]}
                   />
                   <FormSelect
-                    fieldName={"partialDelivery"}
+                    fieldName={"evaluatePartial"}
                     label={"partialDelivery"}
                     required={true}
                     selected={mandate?.evaluatePartial ? [mandate.evaluatePartial] : []}
@@ -210,7 +246,7 @@ export const MandateDetail = () => {
                 </FormContainer>
                 <FormContainerHalfWidth>
                   <FormSelect
-                    fieldName={"comment"}
+                    fieldName={"evaluateComment"}
                     label={"comment"}
                     required={true}
                     selected={mandate?.evaluateComment ? [mandate.evaluateComment] : []}
