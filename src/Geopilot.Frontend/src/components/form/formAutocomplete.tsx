@@ -1,4 +1,4 @@
-import { Autocomplete, SxProps, TextField } from "@mui/material";
+import { Autocomplete, Chip, SxProps, TextField } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { Controller, useFormContext } from "react-hook-form";
 import { FC, SyntheticEvent } from "react";
@@ -20,6 +20,7 @@ export interface FormAutocompleteValue {
   id: number;
   name?: string;
   fullName?: string;
+  email?: string;
 }
 
 export const FormAutocomplete: FC<FormAutocompleteProps> = ({
@@ -34,6 +35,22 @@ export const FormAutocomplete: FC<FormAutocompleteProps> = ({
 }) => {
   const { t } = useTranslation();
   const { control, setValue } = useFormContext();
+
+  const formatOptionLabel = (option: FormAutocompleteValue | string): string => {
+    if (typeof option === "string") {
+      return option;
+    }
+
+    if (option.name) {
+      return `${option.name} (ID: ${option.id})`;
+    }
+
+    if (option.fullName) {
+      return `${option.fullName} (${option.email})`;
+    }
+
+    return "";
+  };
 
   return (
     <Controller
@@ -54,6 +71,14 @@ export const FormAutocomplete: FC<FormAutocompleteProps> = ({
           onChange={(event: SyntheticEvent, newValue: (string | FormAutocompleteValue)[]) =>
             setValue(fieldName, newValue, { shouldValidate: true, shouldDirty: true, shouldTouch: true })
           }
+          renderTags={(tagValue, getTagProps) =>
+            tagValue.map((option, index) => {
+              const label = typeof option === "string" ? option : option.name || option.fullName || "";
+              const key = typeof option === "string" ? option : option.id;
+
+              return <Chip {...getTagProps({ index })} key={key} label={label} />;
+            })
+          }
           renderInput={params => (
             <TextField
               {...params}
@@ -64,11 +89,10 @@ export const FormAutocomplete: FC<FormAutocompleteProps> = ({
             />
           )}
           options={values || []}
-          getOptionLabel={(option: FormAutocompleteValue | string) =>
-            typeof option === "string"
-              ? option
-              : (option as FormAutocompleteValue).name || (option as FormAutocompleteValue).fullName || ""
+          getOptionKey={(option: string | FormAutocompleteValue) =>
+            typeof option === "string" ? option : String(option.id)
           }
+          getOptionLabel={formatOptionLabel}
           isOptionEqualToValue={(option, value) =>
             typeof option === "string" ? option === value : option.id === (value as FormAutocompleteValue).id
           }
