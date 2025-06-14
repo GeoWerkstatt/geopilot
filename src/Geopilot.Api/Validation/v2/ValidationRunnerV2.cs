@@ -168,4 +168,51 @@ public class ValidationRunnerV2 : BackgroundService
         }
     }
 
+    private async Task<bool> ValidateSingleFileAsync(
+        ValidationJobFile file,
+        Models.ValidationJob job,
+        Context context,
+        IEnumerable<IValidatorV2> validators,
+        CancellationToken stoppingToken)
+    {
+        logger.LogInformation("Validating file {FileName} for job {JobId}", file.OriginalFileName, job.Id);
+
+        try
+        {
+            var validator = await GetValidatorAsync(file, validators, stoppingToken);
+            if (validator == null)
+                return await SetFileErrorAsync(file, context,
+                    $"No validator for '{Path.GetExtension(file.OriginalFileName)}'", stoppingToken);
+
+            await using var fileStream = await GetFileStreamAsync(file, stoppingToken);
+            if (fileStream == null)
+                return await SetFileErrorAsync(file, context, "Unable to access file", stoppingToken);
+
+            await SetFileStatusAsync(file, context, FileStatus.Validating, stoppingToken);
+
+            var result = await validator.ExecuteAsync(fileStream, file.OriginalFileName, stoppingToken);
+
+            return await ProcessValidationResultAsync(file, context, result, stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error validating file {FileName}", file.OriginalFileName);
+            return await SetFileErrorAsync(file, context, ex.Message, stoppingToken, FileStatus.ErrorProcessing);
+        }
+    }
+
+    private async Task<IValidatorV2?> GetValidatorAsync(ValidationJobFile file, IEnumerable<IValidatorV2> validators,
+        CancellationToken stoppingToken)
+    {
+        var ext = Path.GetExtension(file.OriginalFileName);
+
+        // TODO: Implement mandate specific validator selection logic
+        var mandateConfig = GetValidationConfigForMandateAsync();
+        if (mandateConfig != null)
+        {
+            // TODO: Logic
+        }
+
+        return await FindByExtensionAsync(ext, validators, stoppingToken);
+    }
 }
