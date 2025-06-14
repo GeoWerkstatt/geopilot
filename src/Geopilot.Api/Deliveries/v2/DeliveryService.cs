@@ -59,4 +59,54 @@ public class DeliveryService : IDeliveryService
 
         return delivery;
     }
+
+    /// <summary>
+    /// Validates the business logic preconditions for creating a delivery.
+    /// This includes checking user authorization, mandate rules, and precursor/partial/comment requirements.
+    /// </summary>
+    /// <param name="request">The incoming delivery request.</param>
+    /// <param name="userPrincipal">The principal of the user making the request.</param>
+    /// <returns>A tuple containing the validated <see cref="Mandate"/>, <see cref="User"/>, and optional precursor <see cref="Models.Delivery"/>.</returns>
+    /// <exception cref="DeliveryValidationException">Thrown if any business rule is violated.</exception>
+    private async Task<(Mandate Mandate, User User, Delivery? Precursor)> ValidatePreconditionsAsync(DeliveryRequest request, ClaimsPrincipal userPrincipal)
+    {
+        var user = await context.GetUserByPrincipalAsync(userPrincipal)
+            ?? throw new DeliveryValidationException("User not found.");
+
+        var mandate = await context.Mandates
+            .Include(m => m.Organisations)
+            .ThenInclude(o => o.Users)
+            .Include(m => m.Deliveries)
+            .SingleOrDefaultAsync(m => m.Id == request.MandateId)
+            ?? throw new DeliveryValidationException($"Mandate with id <{request.MandateId}> not found.");
+
+        if (mandate.Organisations.SelectMany(u => u.Users).All(u => u.Id != user.Id))
+        {
+            throw new DeliveryValidationException($"User is not authorized for mandate <{request.MandateId}>.");
+        }
+
+        if (mandate.EvaluatePrecursorDelivery == FieldEvaluationType.Required && !request.PrecursorDeliveryId.HasValue)
+            throw new DeliveryValidationException("Precursor delivery is required for this mandate.");
+        if (mandate.EvaluatePrecursorDelivery == FieldEvaluationType.NotEvaluated && request.PrecursorDeliveryId.HasValue)
+            throw new DeliveryValidationException("Precursor delivery is not allowed for this mandate.");
+
+        Delivery? precursorDelivery = null;
+        if (request.PrecursorDeliveryId.HasValue)
+        {
+            precursorDelivery = mandate.Deliveries.SingleOrDefault(d => d.Id == request.PrecursorDeliveryId.Value)
+                ?? throw new DeliveryValidationException("Precursor delivery not found.");
+        }
+
+        if (mandate.EvaluatePartial == FieldEvaluationType.Required && !request.PartialDelivery.HasValue)
+            throw new DeliveryValidationException("Partial delivery is required for this mandate.");
+        if (mandate.EvaluatePartial == FieldEvaluationType.NotEvaluated && request.PartialDelivery.HasValue)
+            throw new DeliveryValidationException("Partial delivery is not allowed for this mandate.");
+
+        if (mandate.EvaluateComment == FieldEvaluationType.Required && string.IsNullOrWhiteSpace(request.Comment))
+            throw new DeliveryValidationException("Comment is required for this mandate.");
+        if (mandate.EvaluateComment == FieldEvaluationType.NotEvaluated && !string.IsNullOrWhiteSpace(request.Comment))
+            throw new DeliveryValidationException("Comment is not allowed for this mandate.");
+
+        return (mandate, user, precursorDelivery);
+    }
 }
