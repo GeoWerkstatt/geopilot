@@ -189,6 +189,37 @@ builder.Services.Configure<ValidationRunnerV2Options>(builder.Configuration.GetS
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = MaxRequestBodySize);
 builder.Services.Configure<KestrelServerOptions>(options => options.Limits.MaxRequestBodySize = MaxRequestBodySize);
 
+builder.Services.AddSingleton<IBlobStorageService>(provider =>
+{
+    var options = provider.GetRequiredService<IOptions<AzureBlobStorageOptions>>();
+    var logger = provider.GetRequiredService<ILogger<AzureBlobStorageService>>();
+
+    var blobClientOptions = new BlobClientOptions()
+    {
+        Transport = new HttpClientTransport(new HttpClient()
+        {
+            Timeout = TimeSpan.FromHours(1)
+        })
+    };
+
+    return new AzureBlobStorageService(options, logger, blobClientOptions);
+});
+builder.Services.AddScoped<IValidationJobService, ValidationJobService>();
+builder.Services.AddScoped<IValidationJobFileService, ValidationJobFileService>();
+builder.Services.AddScoped<IVirusScanService, VirusScanService>();
+builder.Services.AddScoped<IValidatorV2, InterlisValidatorV2>();
+builder.Services.AddScoped<IDeliveryService, DeliveryService>();
+builder.Services.AddScoped<IValidationJobLogService, ValidationJobLogService>();
+
+builder.Services.AddHostedService<ValidationRunnerV2>();
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+});
+
 var app = builder.Build();
 
 // Migrate db changes on startup
