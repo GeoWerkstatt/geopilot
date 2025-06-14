@@ -180,4 +180,21 @@ public class InterlisValidatorV2 : IValidatorV2
         return CreateFailureResult(timeoutMessage);
     }
 
+    /// <summary>
+    /// Creates a final <see cref="ValidatorV2Result"/> from a completed status response.
+    /// </summary>
+    /// <param name="statusData">The status response from the validation service.</param>
+    /// <param name="stoppingToken">A cancellation token.</param>
+    /// <returns>The mapped validation result.</returns>
+    private async Task<ValidatorV2Result> CreateResultFromStatusAsync(InterlisStatusResponse statusData, CancellationToken stoppingToken)
+    {
+        var logs = await CollectLogsAsync(statusData, stoppingToken);
+
+        return new ValidatorV2Result
+        {
+            Status = statusData.Status,
+            Message = statusData.StatusMessage ?? string.Empty,
+            Logs = logs
+        };
+    }
 }
