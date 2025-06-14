@@ -112,6 +112,43 @@ public class AzureBlobStorageService : IBlobStorageService
         BlobDownloadInfo download = await blobClient.DownloadAsync(cancellationToken: cancellationToken);
         return download.Content;
     }
+
+    /// <inheritdoc />
+    public async Task<FileStatus> GetVirusScanStatusAsync(string blobPath)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(blobPath);
+        try
+        {
+            if (!await blobClient.ExistsAsync())
+                return FileStatus.ErrorProcessing;
+
+
+            Response<GetBlobTagResult> tagsResponse = await blobClient.GetTagsAsync();
+            if (!tagsResponse.Value.Tags.TryGetValue(DefenderScanResultTag, out var scanResult))
+                return FileStatus.AwaitingVirusScanResult;
+
+            // Tags can be found here: https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/storagemalwarescanningresults
+            // Seems the tags are wrong, it should be no threatS found -.-
+            return scanResult?.ToLowerInvariant() switch
+            {
+                "no threats found" => FileStatus.Clean,
+                "malicious" => FileStatus.Infected,
+                "error" => FileStatus.ErrorProcessing,
+                _ => FileStatus.AwaitingVirusScanResult
+            };
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return FileStatus.ErrorProcessing;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting virus scan status for blob {BlobPath}", blobPath);
+            return FileStatus.ErrorProcessing;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task UploadBlobAsync(string blobName, Stream contentStream, CancellationToken cancellationToken = default)
     {
         var blobClient = blobContainerClient.GetBlobClient(blobName);
