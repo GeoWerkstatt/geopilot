@@ -329,4 +329,47 @@ public class ValidationRunnerV2 : BackgroundService
             return null;
         }
     }
+
+    private async Task DetermineFinalJobStatusAsync(Models.ValidationJob job, Context context,
+        CancellationToken stoppingToken)
+    {
+        // Reload all files to get current status
+        var allFiles = await context.ValidationJobFiles
+            .Where(file => file.ValidationJobId == job.Id)
+            .ToListAsync(stoppingToken);
+
+        if (allFiles.All(f => f.FileStatus == FileStatus.Valid))
+        {
+            job.Status = Models.ValidationJobStatus.Completed;
+            job.CompletedAt = DateTime.UtcNow;
+            logger.LogInformation("Job {JobId} completed successfully", job.Id);
+        }
+        else if (allFiles.Any(f => f.FileStatus == FileStatus.Invalid ||
+                                   f.FileStatus == FileStatus.Infected ||
+                                   f.FileStatus == FileStatus.ErrorProcessing))
+        {
+            job.Status = Models.ValidationJobStatus.Failed;
+            job.FailureReason = "One or more files failed validation or scanning";
+            job.CompletedAt = DateTime.UtcNow;
+            logger.LogWarning("Job {JobId} failed due to file validation/scanning issues", job.Id);
+        }
+        else
+        {
+            logger.LogInformation("Job {JobId} still has files in progress", job.Id);
+        }
+
+        await context.SaveChangesAsync(stoppingToken);
+    }
+
+    private async Task FailJobAsync(Models.ValidationJob job, Context context, string reason,
+        CancellationToken stoppingToken)
+    {
+        job.Status = Models.ValidationJobStatus.Failed;
+        job.FailureReason = reason;
+        job.CompletedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync(stoppingToken);
+        logger.LogWarning("Job {JobId} failed: {Reason}", job.Id, reason);
+    }
+
 }
