@@ -69,3 +69,37 @@ public class DeliveryV2Controller : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Maps the internal <see cref="Models.Delivery"/> domain model to the public <see cref="DeliveryResponse"/> contract.
+    /// </summary>
+    /// <param name="delivery">The internal delivery entity from the database.</param>
+    /// <returns>A <see cref="DeliveryResponse"/> object suitable for sending to the client.</returns>
+    private DeliveryResponse MapToResponse(Models.Delivery delivery)
+    {
+        return new DeliveryResponse
+        {
+            Id = delivery.Id,
+            JobId = delivery.JobId,
+            Date = delivery.Date,
+            DeclaringUser = new UserSummary
+            {
+                Email = delivery.DeclaringUser.Email,
+                FullName = delivery.DeclaringUser.FullName
+            },
+            Mandate = new MandateSummary
+            {
+                Id = delivery.Mandate.Id,
+                Name = delivery.Mandate.Name
+            },
+            Assets = delivery.Assets.Select(a => new AssetSummary
+            {
+                Id = a.Id,
+                OriginalFilename = a.OriginalFilename,
+                AssetType = a.AssetType.ToString(),
+                FileHash = Convert.ToBase64String(a.FileHash)
+            }).ToList(),
+            Partial = delivery.Partial,
+            Comment = delivery.Comment
+        };
+    }
+}
