@@ -2,6 +2,8 @@
 using Geopilot.Api.Validation;
 using Microsoft.AspNetCore.StaticFiles;
 using System.Security.Cryptography;
+using ValidationJob = Geopilot.Api.Validation.ValidationJob;
+using ValidationJobStatus = Geopilot.Api.Validation.ValidationJobStatus;
 
 namespace Geopilot.Api.FileAccess;
 
