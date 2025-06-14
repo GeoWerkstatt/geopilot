@@ -215,4 +215,29 @@ public class ValidationRunnerV2 : BackgroundService
 
         return await FindByExtensionAsync(ext, validators, stoppingToken);
     }
+
+    private async Task<bool> ProcessValidationResultAsync(
+        ValidationJobFile file,
+        Context context,
+        ValidatorV2Result result,
+        CancellationToken stoppingToken)
+    {
+        var isValid = result.Status is Status.Completed;
+        file.FileStatus = isValid ? FileStatus.Valid : FileStatus.Invalid;
+        file.ValidationResult = result.Message;
+
+        if (result.Logs != null)
+        {
+            await ProcessValidationLogsAsync(file, result.Logs, context, stoppingToken);
+        }
+
+        await context.SaveChangesAsync(stoppingToken);
+        logger.LogInformation(
+            "File {FileName} validation completed: {Status}",
+            file.OriginalFileName,
+            file.FileStatus);
+
+        return isValid;
+    }
+
 }
