@@ -58,3 +58,29 @@ public class AzureBlobStorageService : IBlobStorageService
         blobContainerClient.CreateIfNotExists();
     }
 
+    /// <inheritdoc />
+    public Task<string> GeneratePresignedUploadUrlAsync(string blobPath, TimeSpan? expiry,
+        string? contentType = null)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(blobPath);
+
+        if (!blobClient.CanGenerateSasUri)
+        {
+            logger.LogError(
+                "BlobClient cannot generate SAS URI. Check account permissions and ensure all credentials are still valid.");
+            throw new InvalidOperationException("Cannot generate SAS URI. Check account permissions.");
+        }
+
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = blobContainerClient.Name,
+            BlobName = blobPath,
+            Resource = "b",
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
+            ExpiresOn = DateTimeOffset.UtcNow.Add(expiry ?? TimeSpan.FromMinutes(azureBlobStorageOptions.PresignedUrlExpiryMinutes))
+        };
+        sasBuilder.SetPermissions(BlobSasPermissions.Write | BlobSasPermissions.Create);
+
+        return Task.FromResult(blobClient.GenerateSasUri(sasBuilder).ToString());
+    }
+}
