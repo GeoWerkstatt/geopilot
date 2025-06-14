@@ -139,4 +139,45 @@ public class InterlisValidatorV2 : IValidatorV2
         }
     }
 
+    /// <summary>
+    /// Polls the given status URL until the validation is complete, times out, or is cancelled.
+    /// </summary>
+    /// <param name="statusUrl">The URL to poll for status updates.</param>
+    /// <param name="stoppingToken">A cancellation token.</param>
+    /// <returns>The final validation result.</returns>
+    private async Task<ValidatorV2Result> PollForCompletionAsync(string statusUrl, CancellationToken stoppingToken)
+    {
+        var client = httpClientFactory.CreateClient("INTERLIS_VALIDATOR_HTTP_CLIENT");
+        var pollCount = 0;
+
+        while (!stoppingToken.IsCancellationRequested && pollCount++ < MaxPolls)
+        {
+            await Task.Delay(PollInterval, stoppingToken).ConfigureAwait(false);
+
+            try
+            {
+                var pollResp = await client.GetAsync(statusUrl, stoppingToken).ConfigureAwait(false);
+                pollResp.EnsureSuccessStatusCode();
+
+                var statusData = await pollResp.Content
+                    .ReadFromJsonAsync<InterlisStatusResponse>(jsonOptions, stoppingToken)
+                    .ConfigureAwait(false);
+
+                if (statusData != null && statusData.Status != Status.Processing)
+                {
+                    return await CreateResultFromStatusAsync(statusData, stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error polling validation status from {StatusUrl}", statusUrl);
+                return CreateFailureResult($"Error checking validation status: {ex.Message}");
+            }
+        }
+
+        var timeoutMessage = $"Validation timed out after {MaxPolls} polls ({PollInterval.TotalSeconds * MaxPolls:N0}s).";
+        logger.LogWarning("Validation timeout for status URL: {StatusUrl}", statusUrl);
+        return CreateFailureResult(timeoutMessage);
+    }
+
 }
