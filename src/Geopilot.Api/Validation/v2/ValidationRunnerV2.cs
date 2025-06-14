@@ -129,4 +129,43 @@ public class ValidationRunnerV2 : BackgroundService
         }
     }
 
+    private async Task ValidateJobFilesAsync(Models.ValidationJob job, Context context,
+        IList<IValidatorV2> validators, CancellationToken stoppingToken)
+    {
+        job.Status = Models.ValidationJobStatus.Validating;
+        await context.SaveChangesAsync(stoppingToken);
+        var cleanFiles = job.Files.Where(file => file.FileStatus == FileStatus.Clean).ToList();
+        if (!cleanFiles.Any())
+        {
+            await DetermineFinalJobStatusAsync(job, context, stoppingToken);
+            return;
+        }
+
+        var failureReasons = new List<string>();
+
+        foreach (var file in cleanFiles)
+        {
+            if (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            var success = await ValidateSingleFileAsync(file, job, context, validators, stoppingToken);
+
+            if (!success)
+            {
+                failureReasons.Add($"File '{file.OriginalFileName}' failed validation");
+            }
+        }
+
+        if (failureReasons.Any())
+        {
+            await FailJobAsync(job, context, string.Join("; ", failureReasons), stoppingToken);
+        }
+        else
+        {
+            await DetermineFinalJobStatusAsync(job, context, stoppingToken);
+        }
+    }
+
 }
