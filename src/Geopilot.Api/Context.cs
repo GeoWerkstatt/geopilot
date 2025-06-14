@@ -124,5 +124,35 @@ public class Context : DbContext
         modelBuilder.Entity<Asset>()
             .HasQueryFilter(a => !a.Delivery.Deleted)
             .HasQueryFilter(a => !a.Deleted);
+        modelBuilder.Entity<ValidationJob>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.HasIndex(e => e.Status);
+        });
+
+        modelBuilder.Entity<ValidationJobFile>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FileStatus).HasConversion<string>();
+            entity.HasOne(d => d.ValidationJob)
+                .WithMany(p => p.Files)
+                .HasForeignKey(d => d.ValidationJobId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ValidationJobId, e.FileStatus });
+        });
+
+        modelBuilder.Entity<ValidationJobLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StorageType).HasConversion<string>();
+            entity.HasOne(d => d.ValidationJobFile)
+                .WithMany(p => p.Logs)
+                .HasForeignKey(d => d.ValidationJobFileId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ValidationJobFileId, e.LogName });
+        });
     }
 }
