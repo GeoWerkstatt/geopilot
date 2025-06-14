@@ -124,6 +124,7 @@ public class Context : DbContext
         modelBuilder.Entity<Asset>()
             .HasQueryFilter(a => !a.Delivery.Deleted)
             .HasQueryFilter(a => !a.Deleted);
+        
         modelBuilder.Entity<ValidationJob>(entity =>
         {
             entity.HasKey(e => e.Id);
