@@ -40,4 +40,19 @@ public class InterlisValidatorV2 : IValidatorV2
         this.httpClientFactory = httpClientFactory;
         this.jsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
+
+    /// <inheritdoc />
+    public async Task<ICollection<string>> GetSupportedFileExtensionsAsync(CancellationToken stoppingToken)
+    {
+        var client = httpClientFactory.CreateClient("INTERLIS_VALIDATOR_HTTP_CLIENT");
+        var response = await client.GetAsync(SettingsUrl, stoppingToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var config = await response.Content.ReadFromJsonAsync<InterlisSettingsResponse>(
+            jsonOptions,
+            stoppingToken
+        ).ConfigureAwait(false);
+
+        return config?.AcceptedFileTypes?.Split(", ", StringSplitOptions.RemoveEmptyEntries) ?? [];
+    }
 }
