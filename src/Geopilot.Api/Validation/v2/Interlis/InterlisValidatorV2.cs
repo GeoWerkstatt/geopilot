@@ -197,4 +197,47 @@ public class InterlisValidatorV2 : IValidatorV2
             Logs = logs
         };
     }
+
+    /// <summary>
+    /// Collects all available log files from the URLs provided in the status response.
+    /// </summary>
+    /// <param name="statusData">The status response containing log URLs.</param>
+    /// <param name="stoppingToken">A cancellation token.</param>
+    /// <returns>A dictionary of log names to log content, or null if no logs are available.</returns>
+    private async Task<Dictionary<string, string>?> CollectLogsAsync(InterlisStatusResponse statusData, CancellationToken stoppingToken)
+    {
+        var client = httpClientFactory.CreateClient("INTERLIS_VALIDATOR_HTTP_CLIENT");
+        var logs = new Dictionary<string, string>();
+
+        try
+        {
+            if (statusData.LogUrl != null)
+                logs["Log"] = await client.GetStringAsync(statusData.LogUrl, stoppingToken).ConfigureAwait(false);
+
+            if (statusData.XtfLogUrl != null)
+                logs["Xtf-Log"] = await client.GetStringAsync(statusData.XtfLogUrl, stoppingToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to collect some validation logs");
+            // Return partial logs rather than failing entirely
+        }
+
+        return logs.Any() ? logs : null;
+    }
+
+    /// <summary>
+    /// Creates a generic failure result.
+    /// </summary>
+    /// <param name="message">The failure message.</param>
+    /// <returns>A validation result with a 'Failed' status.</returns>
+    private static ValidatorV2Result CreateFailureResult(string message)
+    {
+        return new ValidatorV2Result
+        {
+            Status = Status.Failed,
+            Message = message,
+            Logs = null
+        };
+    }
 }
