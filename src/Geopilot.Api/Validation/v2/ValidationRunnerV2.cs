@@ -306,4 +306,27 @@ public class ValidationRunnerV2 : BackgroundService
         await context.SaveChangesAsync(stoppingToken);
     }
 
+    private async Task<Stream?> GetFileStreamAsync(ValidationJobFile file, CancellationToken stoppingToken)
+    {
+        try
+        {
+            return file.StorageType switch
+            {
+                StorageType.AzureBlobStorage =>
+                    await blobStorageService.DownloadBlobAsync(file.Location, stoppingToken),
+                StorageType.LocalFileSystem => throw new NotSupportedException("LocalFileSystem not supported"),
+                _ => throw new NotSupportedException($"Storage type {file.StorageType} not supported")
+            };
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or NotSupportedException)
+        {
+            logger.LogError("Storage error for {Location}: {Message}", file.Location, ex.Message);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error accessing {Location}", file.Location);
+            return null;
+        }
+    }
 }
