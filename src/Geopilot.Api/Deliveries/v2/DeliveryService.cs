@@ -109,4 +109,30 @@ public class DeliveryService : IDeliveryService
 
         return (mandate, user, precursorDelivery);
     }
+
+    /// <summary>
+    /// Ensures the specified <see cref="ValidationJob"/> exists and is in the 'Completed' state.
+    /// </summary>
+    /// <param name="jobId">The ID of the validation job to check.</param>
+    /// <returns>The validated <see cref="ValidationJob"/> with its files and logs included.</returns>
+    /// <exception cref="ValidationJobNotFoundException">Thrown if the job does not exist or is not complete.</exception>
+    private async Task<ValidationJob> ValidateV2JobAsync(Guid jobId)
+    {
+        var v2Job = await context.ValidationJobs
+            .AsNoTracking() // We don't need to track this entity, just read it.
+            .Include(j => j.Files) // IMPORTANT: Load the associated files.
+            .ThenInclude(f => f.Logs)
+            .FirstOrDefaultAsync(j => j.Id == jobId);
+
+        if (v2Job == null)
+        {
+            throw new ValidationJobNotFoundException($"V2 job {jobId} not found.");
+        }
+        if (v2Job.Status != ValidationJobStatus.Completed)
+        {
+            throw new ValidationJobNotFoundException($"V2 job {jobId} is not complete. Current status: {v2Job.Status}.");
+        }
+
+        return v2Job;
+    }
 }
