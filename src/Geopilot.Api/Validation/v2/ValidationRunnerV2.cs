@@ -104,4 +104,29 @@ public class ValidationRunnerV2 : BackgroundService
             .Include(j => j.Files)
             .ToListAsync(stoppingToken);
     }
+
+    private async Task ProcessSingleJobAsync(Models.ValidationJob job, Context context,
+        IVirusScanService virusScanService, IList<IValidatorV2> validators, CancellationToken stoppingToken)
+    {
+        // Check if virus scan complete, update validation status accordingly
+        if (job.Status == Models.ValidationJobStatus.Queued ||
+            job.Status == Models.ValidationJobStatus.AwaitingVirusScanResults)
+        {
+            await virusScanService.ProcessJobForVirusScansAsync(job.Id);
+            await context.Entry(job).ReloadAsync(stoppingToken);
+        }
+
+        // Validate if all files clean
+        if (job.Status == Models.ValidationJobStatus.AwaitingValidation)
+        {
+            if (!job.MandateId.HasValue)
+            {
+                await FailJobAsync(job, context, "MandateId not set for validation", stoppingToken);
+                return;
+            }
+
+            await ValidateJobFilesAsync(job, context, validators, stoppingToken);
+        }
+    }
+
 }
