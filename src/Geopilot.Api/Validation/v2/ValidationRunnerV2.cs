@@ -63,4 +63,45 @@ public class ValidationRunnerV2 : BackgroundService
 
         logger.LogInformation("ValidationRunnerV2 stopped");
     }
+
+    private async Task ProcessPendingJobsAsync(CancellationToken stoppingToken)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<Context>();
+        var virusScanService = scope.ServiceProvider.GetRequiredService<IVirusScanService>();
+        var validators = scope.ServiceProvider.GetRequiredService<IEnumerable<IValidatorV2>>().ToList();
+
+        var jobs = await GetJobsToProcessAsync(context, stoppingToken);
+
+        foreach (var job in jobs)
+        {
+            if (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            logger.LogInformation("Processing job {JobId} with status {Status}", job.Id, job.Status);
+
+            try
+            {
+                await ProcessSingleJobAsync(job, context, virusScanService, validators, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error processing job {JobId}", job.Id);
+                await FailJobAsync(job, context, $"Processing error: {ex.Message}", stoppingToken);
+            }
+        }
+    }
+
+    private async Task<List<Models.ValidationJob>> GetJobsToProcessAsync(Context context,
+        CancellationToken stoppingToken)
+    {
+        return await context.ValidationJobs
+            .Where(job => job.Status == Models.ValidationJobStatus.Queued
+                          || job.Status == Models.ValidationJobStatus.AwaitingVirusScanResults
+                          || job.Status == Models.ValidationJobStatus.AwaitingValidation)
+            .Include(j => j.Files)
+            .ToListAsync(stoppingToken);
+    }
 }
