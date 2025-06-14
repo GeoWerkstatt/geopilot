@@ -330,6 +330,12 @@ public class ValidationRunnerV2 : BackgroundService
         }
     }
 
+    private object? GetValidationConfigForMandateAsync()
+    {
+        // TODO: pull from DB later; for now always null => use extension list
+        return null;
+    }
+
     private async Task DetermineFinalJobStatusAsync(Models.ValidationJob job, Context context,
         CancellationToken stoppingToken)
     {
@@ -370,6 +376,22 @@ public class ValidationRunnerV2 : BackgroundService
 
         await context.SaveChangesAsync(stoppingToken);
         logger.LogWarning("Job {JobId} failed: {Reason}", job.Id, reason);
+    }
+
+    /// <summary>
+    /// Finds the first validator that advertises support for the given extension.
+    /// </summary>
+    private async Task<IValidatorV2?> FindByExtensionAsync(string ext, IEnumerable<IValidatorV2> validators,
+        CancellationToken ct)
+    {
+        foreach (var validator in validators)
+        {
+            var supported = await validator.GetSupportedFileExtensionsAsync(ct);
+            if (supported.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                return validator;
+        }
+
+        return null;
     }
 
 }
