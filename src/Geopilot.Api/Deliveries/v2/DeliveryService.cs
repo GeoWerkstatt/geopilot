@@ -35,3 +35,28 @@ public class DeliveryService : IDeliveryService
         this.directoryProvider = directoryProvider;
     }
 
+    /// <inheritdoc />
+    public async Task<Delivery> CreateV2DeliveryAsync(DeliveryRequest request, ClaimsPrincipal userPrincipal)
+    {
+        var (mandate, user, precursor) = await ValidatePreconditionsAsync(request, userPrincipal);
+
+        var v2Job = await ValidateV2JobAsync(request.JobId);
+        var assets = await PersistV2AssetsAsync(v2Job);
+
+        var delivery = new Delivery
+        {
+            JobId = request.JobId,
+            Mandate = mandate,
+            DeclaringUser = user,
+            PrecursorDelivery = precursor,
+            Partial = request.PartialDelivery,
+            Comment = request.Comment?.Trim() ?? string.Empty,
+            Assets = assets
+        };
+
+        context.Deliveries.Add(entity: delivery);
+        await context.SaveChangesAsync();
+
+        return delivery;
+    }
+}
