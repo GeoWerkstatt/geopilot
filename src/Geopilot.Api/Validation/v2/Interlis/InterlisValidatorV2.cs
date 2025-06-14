@@ -98,4 +98,45 @@ public class InterlisValidatorV2 : IValidatorV2
         return null;
     }
 
+    /// <summary>
+    /// Uploads the file stream to the external INTERLIS validation service.
+    /// </summary>
+    /// <param name="fileStream">The stream containing the file content.</param>
+    /// <param name="fileName">The original filename.</param>
+    /// <param name="stoppingToken">A cancellation token.</param>
+    /// <returns>The status URL for polling the validation result, or null if the upload fails.</returns>
+    private async Task<string?> UploadToValidatorAsync(Stream fileStream, string fileName, CancellationToken stoppingToken)
+    {
+        var client = httpClientFactory.CreateClient("INTERLIS_VALIDATOR_HTTP_CLIENT");
+        using var form = new MultipartFormDataContent();
+        form.Add(new StreamContent(fileStream), "file", fileName);
+
+        try
+        {
+            var uploadResponse = await client.PostAsync(UploadUrl, form, stoppingToken).ConfigureAwait(false);
+
+            if (uploadResponse.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var problemDetails = await uploadResponse.Content
+                    .ReadFromJsonAsync<ValidationProblemDetails>(jsonOptions, stoppingToken)
+                    .ConfigureAwait(false);
+                logger.LogWarning("Upload rejected: {Detail}", problemDetails?.Detail ?? "Invalid transfer file");
+                return null;
+            }
+
+            uploadResponse.EnsureSuccessStatusCode();
+
+            var uploadData = await uploadResponse.Content
+                .ReadFromJsonAsync<InterlisUploadResponse>(jsonOptions, stoppingToken)
+                .ConfigureAwait(false);
+
+            return uploadData?.StatusUrl;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Upload to Interlis failed for file '{FileName}'", fileName);
+            return null;
+        }
+    }
+
 }
