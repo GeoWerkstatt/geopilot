@@ -295,4 +295,15 @@ public class ValidationRunnerV2 : BackgroundService
         logger.LogWarning("File {FileName} validation failed: {Error}", file.OriginalFileName, errorMessage);
         return false;
     }
+
+    private async Task SetFileStatusAsync(
+        ValidationJobFile file,
+        Context context,
+        FileStatus status,
+        CancellationToken stoppingToken)
+    {
+        file.FileStatus = status;
+        await context.SaveChangesAsync(stoppingToken);
+    }
+
 }
