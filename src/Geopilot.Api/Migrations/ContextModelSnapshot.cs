@@ -187,6 +187,111 @@ namespace Geopilot.Api.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("MandateId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MandateId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ValidationJobs");
+                });
+
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJobFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<long?>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileStatus")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("StorageType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ValidationJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ValidationResult")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ValidationJobId", "FileStatus");
+
+                    b.ToTable("ValidationJobFiles");
+                });
+
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJobLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("LogName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StorageType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ValidationJobFileId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ValidationJobFileId", "LogName");
+
+                    b.ToTable("ValidationJobLogs");
+                });
+
             modelBuilder.Entity("MandateOrganisation", b =>
                 {
                     b.Property<int>("MandatesId")
@@ -253,6 +358,37 @@ namespace Geopilot.Api.Migrations
                     b.Navigation("PrecursorDelivery");
                 });
 
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJob", b =>
+                {
+                    b.HasOne("Geopilot.Api.Models.Mandate", "Mandate")
+                        .WithMany()
+                        .HasForeignKey("MandateId");
+
+                    b.Navigation("Mandate");
+                });
+
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJobFile", b =>
+                {
+                    b.HasOne("Geopilot.Api.Models.ValidationJob", "ValidationJob")
+                        .WithMany("Files")
+                        .HasForeignKey("ValidationJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ValidationJob");
+                });
+
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJobLog", b =>
+                {
+                    b.HasOne("Geopilot.Api.Models.ValidationJobFile", "ValidationJobFile")
+                        .WithMany("Logs")
+                        .HasForeignKey("ValidationJobFileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ValidationJobFile");
+                });
+
             modelBuilder.Entity("MandateOrganisation", b =>
                 {
                     b.HasOne("Geopilot.Api.Models.Mandate", null)
@@ -296,6 +432,16 @@ namespace Geopilot.Api.Migrations
             modelBuilder.Entity("Geopilot.Api.Models.User", b =>
                 {
                     b.Navigation("Deliveries");
+                });
+
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJob", b =>
+                {
+                    b.Navigation("Files");
+                });
+
+            modelBuilder.Entity("Geopilot.Api.Models.ValidationJobFile", b =>
+                {
+                    b.Navigation("Logs");
                 });
 #pragma warning restore 612, 618
         }
