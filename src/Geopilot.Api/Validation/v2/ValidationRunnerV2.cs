@@ -240,4 +240,45 @@ public class ValidationRunnerV2 : BackgroundService
         return isValid;
     }
 
+    private async Task ProcessValidationLogsAsync(
+        ValidationJobFile file,
+        Dictionary<string, string> logs,
+        Context context,
+        CancellationToken stoppingToken)
+    {
+        foreach (var (logName, logContent) in logs)
+        {
+            try
+            {
+                // Generate unique blob name for this log
+                var blobName = $"validation-logs/{file.ValidationJobId}/{file.Id}/{logName}_{Guid.NewGuid()}.log";
+
+                // Upload log content to blob storage
+                using var contentStream = new MemoryStream(Encoding.UTF8.GetBytes(logContent));
+                await blobStorageService.UploadBlobAsync(blobName, contentStream, stoppingToken);
+
+                // Create database entry for the log
+                var logEntry = new ValidationJobLog
+                {
+                    Id = Guid.NewGuid(),
+                    ValidationJobFileId = file.Id,
+                    LogName = logName,
+                    Location = blobName,
+                    StorageType = StorageType.AzureBlobStorage
+                };
+
+                context.ValidationJobLogs.Add(logEntry);
+
+                logger.LogDebug("Stored validation log {LogName} for file {FileName} at {Location}",
+                    logName, file.OriginalFileName, blobName);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to store validation log {LogName} for file {FileName}",
+                    logName, file.OriginalFileName);
+                // Continue processing other logs even if one fails
+            }
+        }
+    }
+
 }
