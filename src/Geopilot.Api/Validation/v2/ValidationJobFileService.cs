@@ -83,4 +83,25 @@ public class ValidationJobFileService : IValidationJobFileService
 
         return files;
     }
+
+    /// <summary>
+    /// Generates storage location paths based on storage backend type and file information.
+    /// </summary>
+    /// <param name="jobId">The validation job ID used for path organization.</param>
+    /// <param name="fileName">The sanitized file name to include in the path.</param>
+    /// <param name="storageType">The storage backend type that determines path format.</param>
+    /// <returns>A location path appropriate for the specified storage type.</returns>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when an unsupported storage type is provided.
+    /// </exception>
+    private static string GenerateLocation(Guid jobId, string fileName, StorageType storageType)
+    {
+        return storageType switch
+        {
+            StorageType.AzureBlobStorage => $"validation-jobs/{jobId}/{Guid.NewGuid():N}_{fileName}",
+            StorageType.LocalFileSystem => $"/uploads/{jobId}/{fileName}",
+            _ => throw new NotSupportedException($"Storage type {storageType} is not supported")
+        };
+    }
+
 }
