@@ -28,4 +28,59 @@ public class ValidationJobFileService : IValidationJobFileService
         this.context = context;
         this.logger = logger;
     }
+
+    /// <inheritdoc />
+    public async Task<List<ValidationJobFile>> CreateFileEntriesAsync(Guid jobId, IEnumerable<string> fileNames, StorageType storageType)
+    {
+        ArgumentNullException.ThrowIfNull(fileNames);
+
+        var fileNamesList = fileNames.Distinct().ToList();
+        if (!fileNamesList.Any())
+        {
+            throw new ArgumentException("File names collection cannot be empty", nameof(fileNames));
+        }
+
+        // Verify job exists
+        var jobExists = await context.ValidationJobs.AnyAsync(j => j.Id == jobId);
+        if (!jobExists)
+        {
+            throw new ArgumentException($"Validation job with ID {jobId} not found", nameof(jobId));
+        }
+
+        var files = new List<ValidationJobFile>();
+
+        foreach (var fileName in fileNamesList)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                logger.LogWarning("Skipping empty or whitespace file name for job {JobId}", jobId);
+                continue;
+            }
+
+            var sanitizedFileName = SanitizeFileName(fileName);
+            var location = GenerateLocation(jobId, sanitizedFileName, storageType);
+
+            var file = new ValidationJobFile
+            {
+                ValidationJobId = jobId,
+                OriginalFileName = fileName,
+                Location = location,
+                StorageType = storageType,
+                FileStatus = FileStatus.Pending
+            };
+
+            files.Add(file);
+        }
+
+        if (files.Any())
+        {
+            await context.ValidationJobFiles.AddRangeAsync(files);
+            await context.SaveChangesAsync();
+
+            logger.LogInformation("Created {FileCount} file entries for job {JobId} with storage type {StorageType}",
+                files.Count, jobId, storageType);
+        }
+
+        return files;
+    }
 }
