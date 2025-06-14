@@ -38,4 +38,29 @@ public class ValidationRunnerV2 : BackgroundService
         this.blobStorageService = blobStorageService;
     }
 
+    /// <summary>
+    /// Executes the main validation processing loop as a background service.
+    /// Continuously polls for pending validation jobs and processes them until cancellation is requested.
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token that signals when the service should stop processing.</param>
+    /// <returns>A task that represents the background service execution.</returns>
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        logger.LogInformation("ValidationRunnerV2 starting");
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await ProcessPendingJobsAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error in ValidationRunnerV2 main loop");
+            }
+
+            await DelayAsync(stoppingToken);
+        }
+
+        logger.LogInformation("ValidationRunnerV2 stopped");
+    }
 }
