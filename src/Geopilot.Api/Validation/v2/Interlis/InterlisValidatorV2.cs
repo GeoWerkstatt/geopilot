@@ -55,4 +55,22 @@ public class InterlisValidatorV2 : IValidatorV2
 
         return config?.AcceptedFileTypes?.Split(", ", StringSplitOptions.RemoveEmptyEntries) ?? [];
     }
+
+    /// <inheritdoc />
+    public async Task<ValidatorV2Result> ExecuteAsync(Stream file, string fileName, CancellationToken stoppingToken)
+    {
+        logger.LogInformation("V2 INTERLIS start: '{FileName}'", fileName);
+
+        var extensionResult = await ValidateFileExtensionAsync(fileName, stoppingToken);
+        if (extensionResult != null)
+            return extensionResult;
+
+        var statusUrl = await UploadToValidatorAsync(file, fileName, stoppingToken);
+        if (statusUrl == null)
+        {
+            return CreateFailureResult("Upload failed - no status URL returned");
+        }
+
+        return await PollForCompletionAsync(statusUrl, stoppingToken);
+    }
 }
