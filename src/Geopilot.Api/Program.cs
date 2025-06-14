@@ -183,6 +183,9 @@ builder.Services
 
 // Set the maximum request body size to 100MB
 const int MaxRequestBodySize = 104857600;
+
+builder.Services.Configure<AzureBlobStorageOptions>(builder.Configuration.GetSection("AzureBlobStorage"));
+builder.Services.Configure<ValidationRunnerV2Options>(builder.Configuration.GetSection("ValidationRunnerV2"));
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = MaxRequestBodySize);
 builder.Services.Configure<KestrelServerOptions>(options => options.Limits.MaxRequestBodySize = MaxRequestBodySize);
 
