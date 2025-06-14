@@ -1,4 +1,4 @@
-﻿using Geopilot.Api.Models;
+﻿﻿using Geopilot.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Geopilot.Api;
@@ -99,6 +99,21 @@ public class Context : DbContext
     /// Set of all <see cref="Asset"/>.
     /// </summary>
     public DbSet<Asset> Assets { get; set; }
+
+    /// <summary>
+    /// Set of all <see cref="ValidationJob"/>.
+    /// </summary>
+    public DbSet<ValidationJob> ValidationJobs { get; set; } = default!;
+
+    /// <summary>
+    /// Set of all <see cref="ValidationJobFile"/>.
+    /// </summary>
+    public DbSet<ValidationJobFile> ValidationJobFiles { get; set; } = default!;
+
+    /// <summary>
+    /// Set of all <see cref="ValidationJobLog"/>.
+    /// </summary>
+    public DbSet<ValidationJobLog> ValidationJobLogs { get; set; } = default!;
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
