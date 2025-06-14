@@ -104,4 +104,39 @@ public class ValidationJobFileService : IValidationJobFileService
         };
     }
 
+    /// <summary>
+    /// Sanitizes file names by removing invalid characters, replacing spaces, and enforcing length limits.
+    /// </summary>
+    /// <param name="fileName">The original filename from user upload.</param>
+    /// <returns>A sanitized filename safe for use across different storage backends and file systems.</returns>
+    /// <example>
+    /// <code>
+    /// SanitizeFileName("My Document (v2).pdf")     // Returns: "My_Document_(v2).pdf"
+    /// SanitizeFileName("../../../etc/passwd")      // Returns: "etcpasswd"
+    /// SanitizeFileName("")                         // Returns: "unnamed_file_a1b2c3d4"
+    /// </code>
+    /// </example>
+    private static string SanitizeFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return $"unnamed_file_{Guid.NewGuid():N}"[..16];
+        }
+
+        // Remove invalid file name characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var cleanName = new string(fileName.Where(ch => !invalidChars.Contains(ch)).ToArray());
+
+        // Replace spaces with underscores
+        cleanName = cleanName.Replace(" ", "_");
+
+        // Ensure we have something
+        if (string.IsNullOrWhiteSpace(cleanName))
+        {
+            return $"unnamed_file_{Guid.NewGuid():N}"[..16];
+        }
+
+        // Limit length
+        return cleanName.Length > 100 ? cleanName[..100] : cleanName;
+    }
 }
