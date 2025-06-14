@@ -83,4 +83,62 @@ public class AzureBlobStorageService : IBlobStorageService
 
         return Task.FromResult(blobClient.GenerateSasUri(sasBuilder).ToString());
     }
+
+    /// <inheritdoc />
+    public async Task<bool> BlobExistsAsync(string blobPath)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(blobPath);
+        return await blobClient.ExistsAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<BlobProperties?> GetBlobPropertiesAsync(string blobPath)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(blobPath);
+        if (!await blobClient.ExistsAsync())
+            return null;
+
+        var properties = await blobClient.GetPropertiesAsync();
+        return properties.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<Stream> DownloadBlobAsync(string blobPath, CancellationToken cancellationToken)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(blobPath);
+        if (!await blobClient.ExistsAsync(cancellationToken))
+            throw new FileNotFoundException($"Blob {blobPath} not found.");
+
+        BlobDownloadInfo download = await blobClient.DownloadAsync(cancellationToken: cancellationToken);
+        return download.Content;
+    }
+    public async Task UploadBlobAsync(string blobName, Stream contentStream, CancellationToken cancellationToken = default)
+    {
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
+
+        try
+        {
+            if (contentStream.CanSeek)
+            {
+                contentStream.Position = 0;
+            }
+
+            await blobClient.UploadAsync(
+                contentStream,
+                overwrite: true,
+                cancellationToken: cancellationToken);
+
+            logger.LogDebug("Successfully uploaded blob {BlobName}", blobName);
+        }
+        catch (RequestFailedException ex)
+        {
+            logger.LogError(ex, "Failed to upload blob {BlobName}: {ErrorCode}", blobName, ex.ErrorCode);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error uploading blob {BlobName}", blobName);
+            throw;
+        }
+    }
 }
