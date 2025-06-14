@@ -73,4 +73,29 @@ public class InterlisValidatorV2 : IValidatorV2
 
         return await PollForCompletionAsync(statusUrl, stoppingToken);
     }
+
+    /// <summary>
+    /// Performs a pre-check to ensure the file extension is supported by querying the external validation service
+    /// for its current capabilities. This ensures consistency between routing logic and validation logic.
+    /// </summary>
+    /// <param name="fileName">The name of the file to check.</param>
+    /// <param name="stoppingToken">Cancellation token for the asynchronous operation.</param>
+    /// <returns>A validation result if the extension is unsupported; otherwise, null to proceed with validation.</returns>
+    private async Task<ValidatorV2Result?> ValidateFileExtensionAsync(string fileName, CancellationToken stoppingToken)
+    {
+        var supportedExtensions = await GetSupportedFileExtensionsAsync(stoppingToken);
+        var fileExtension = Path.GetExtension(fileName);
+
+        if (!supportedExtensions.Contains(fileExtension, StringComparer.OrdinalIgnoreCase))
+        {
+            return new ValidatorV2Result
+            {
+                Status = Status.CompletedWithErrors,
+                Message = $"Extension '{fileExtension}' not supported",
+                Logs = null
+            };
+        }
+        return null;
+    }
+
 }
