@@ -135,4 +135,88 @@ public class DeliveryService : IDeliveryService
 
         return v2Job;
     }
+
+    /// <summary>
+    /// Archives all files and logs associated with a validation job from blob storage to the permanent asset directory.
+    /// It calculates the file hash for each asset during the process.
+    /// </summary>
+    /// <param name="job">The completed validation job whose files need to be persisted.</param>
+    /// <returns>A list of <see cref="Asset"/> entities ready to be saved to the database.</returns>
+    private async Task<List<Asset>> PersistV2AssetsAsync(ValidationJob job)
+    {
+        var persistedAssets = new List<Asset>();
+
+        var assetDirectoryPath = directoryProvider.GetAssetDirectoryPath(job.Id);
+        Directory.CreateDirectory(assetDirectoryPath);
+
+        foreach (var file in job.Files)
+        {
+            await ProcessFileAsAssetAsync(file.Location, file.OriginalFileName, assetDirectoryPath, persistedAssets, AssetType.PrimaryData);
+
+            foreach (var log in file.Logs)
+            {
+                var baseFileName = Path.GetFileNameWithoutExtension(file.OriginalFileName);
+                var extension = Path.GetExtension(file.OriginalFileName);
+                var logFileName = $"{baseFileName}_{log.LogName}{extension}.log";
+
+                await ProcessFileAsAssetAsync(log.Location, logFileName, assetDirectoryPath, persistedAssets, AssetType.ValidationReport);
+            }
+        }
+
+        return persistedAssets;
+    }
+
+    /// <summary>
+    /// Processes a single file from blob storage: downloads it, saves it to the local asset directory
+    /// with a sanitized name, calculates its SHA256 hash, and adds a new <see cref="Asset"/> record to the provided list.
+    /// </summary>
+    /// <param name="blobLocation">The location (path) of the file in blob storage.</param>
+    /// <param name="originalFileName">The original, user-facing filename.</param>
+    /// <param name="destinationDirectory">The local directory to save the asset to.</param>
+    /// <param name="persistedAssets">The list to which the newly created asset will be added.</param>
+    /// <param name="assetType">The type of the asset (e.g., PrimaryData, ValidationReport).</param>
+    private async Task ProcessFileAsAssetAsync(string blobLocation, string originalFileName, string destinationDirectory, List<Asset> persistedAssets, AssetType assetType)
+    {
+        var sanitizedFileName = GenerateSanitizedFilename();
+        var destinationFilePath = Path.Combine(destinationDirectory, sanitizedFileName);
+        byte[] fileHash;
+
+        await using var blobStream = await blobStorageService.DownloadBlobAsync(blobLocation, CancellationToken.None);
+
+        await using (var localFileStream = File.Create(destinationFilePath))
+        {
+            await using var memoryStream = new MemoryStream();
+
+            await blobStream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                fileHash = await sha256.ComputeHashAsync(memoryStream);
+            }
+
+            memoryStream.Position = 0;
+            await memoryStream.CopyToAsync(localFileStream);
+        }
+
+        persistedAssets.Add(new Asset
+        {
+            OriginalFilename = originalFileName,
+            SanitizedFilename = sanitizedFileName,
+            FileHash = fileHash,
+            AssetType = assetType
+        });
+    }
+
+    /// <summary>
+    /// Generates a cryptographically-insecure but random 16-character alphanumeric filename.
+    /// </summary>
+    /// <returns>A 16-character string containing random letters and numbers.</returns>
+    private static string GenerateSanitizedFilename()
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var random = new Random();
+        return new string(Enumerable.Repeat(chars, 16)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+    }
 }
