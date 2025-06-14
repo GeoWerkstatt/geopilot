@@ -394,4 +394,15 @@ public class ValidationRunnerV2 : BackgroundService
         return null;
     }
 
+    private async Task DelayAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(options.PollIntervalSeconds), stoppingToken);
+        }
+        catch (TaskCanceledException)
+        {
+            // Expected when shutting down
+        }
+    }
 }
